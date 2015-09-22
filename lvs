@@ -1,0 +1,1073 @@
+http://ywwd.net/read-827
+
+#!/bin/bash
+#20150201 by http://ywwd.net
+  
+#update
+yum -y update
+           
+#rpm
+yum -y install man vim bind-utils mailx telnel sysstat openssh-clients iptables-devel tcpdump lsof ntpdate
+yum -y groupinstall "Server Platform Development" "Development tools"
+           
+sleep 30
+           
+#check rootkit
+wget http://mirrors.yun-idc.com/epel/6/x86_64/epel-release-6-8.noarch.rpm
+rpm -ivh epel-release-6-8.noarch.rpm
+yum -y install chkrootkit
+chkrootkit |  tee -a chk.txt
+           
+sleep 30
+           
+#test
+#system
+cat /etc/issue && uname -a && hostname && ip add
+           
+#mail
+/etc/init.d/postfix start && echo "test the mail connnet" | mail -s 'mail connect' yourmail@XX.com
+tail /var/log/maillog && mailq | tail
+           
+sleep 30
+    
+#system replace
+sed -i 's/SELINUX=.*/SELINUX=disabled/g' /etc/selinux/config && sestatus
+#
+sed -i 's/LANG=.*/LANG="en_US.UTF-8"/g' /etc/sysconfig/i18n && source /etc/sysconfig/i18n
+#
+sed -i 's/#UseDNS yes/UseDNS no/' /etc/ssh/sshd_config && /etc/init.d/sshd restart
+#
+/etc/init.d/iptables stop && mv /etc/sysconfig/iptables /tmp/
+
+#app
+cd src-xxxx/conf/
+cp my.cnf /etc/
+cp php.ini /etc/
+cp php-fpm.conf /usr/local/php/etc/
+     
+nginx -t && nginx
+/etc/init.d/mysqld start
+/etc/init.d/php-fpm start
+     
+chkconfig php-fpm on
+chkconfig myslqd on
+     
+cat mysql-setup
+mysql_secure_installation
+     
+     
+vim /etc/rsyncd.conf
+vim /etc/rsyncd.secrets
+chmod 600 /etc/rsyncd.secrets
+rsync --daemon
+
+#####
+
+h1. zabbix 使用帮助
+
+h2. 准备工作
+编辑hosts 文件
+<pre>
+58.83.196.221  monitor.ywwd.net
+</pre>
+
+h2. 登录
+在浏览器输入:
+http://monitor.ywwd.net/zabbix/
+
+输入登录信息
+
+h2. 功能模块
+
+主要使用 Monitor 模块
+* dashboard 显示当前zabbix 监控状态,包括主机状态，触发的报警，
+
+#####
+proxmox ve vm.conf
+https://pve.proxmox.com/wiki/Manual:_vm.conf
+
+qm
+pve.proxmox.com/wiki/Manual:_qm
+
+
+
+
+
+ 三、全局变量
+#在if location rewrite 指令中可以使用以下全局变量。
+ $args #这个变量等于请求行中的参数。
+ $content_length #请求头中的Content-length字段。
+ $content_type #请求头中的Content-Type字段。
+ $document_root #当前请求在root指令中指定的值。
+ $host #请求主机头字段，否则为服务器名称。
+ $http_user_agent #客户端agent信息
+ $http_cookie #客户端cookie信息
+ $limit_rate #这个变量可以限制连接速率。
+ $request_body_file #客户端请求主体信息的临时文件名。
+ $request_method #客户端请求的动作，通常为GET或POST。
+ $remote_addr #客户端的IP地址。
+ $remote_port #客户端的端口。
+ $remote_user #已经经过Auth Basic Module验证的用户名。
+ $request_filename #当前请求的文件路径，由root或alias指令与URI请求生成。
+ $query_string #与$args相同。
+ $scheme #HTTP方法（如http，https）。
+ $server_protocol #请求使用的协议，通常是HTTP/1.0或HTTP/1.1。
+ $server_addr #服务器地址，在完成一次系统调用后可以确定这个值。
+ $server_name #服务器名称。
+ $server_port #请求到达服务器的端口号。
+ $request_uri #包含请求参数的原始URI，不包含主机名，如："/foo/bar.php?arg=baz"。
+ $uri  #不带请求参数的当前URI，$uri不包含主机名，如"/foo/bar.html"。
+ $document_uri #与$uri相同。
+
+
+######
+zabbix 监控mysql 
+
+一个示例
+zabbix mysql
+ mysqladmin -uroot -pnandong131 ping | grep alive > /dev/null 2>&1
+
+echo $?
+0
+
+mysqladmin -uroot -pnandong131 ping | grep alive > /dev/null 2>&1
+-bash: mysqladmin: command not found
+
+echo $?
+1
+
+
+mysql show status; 语句等同于  mysqladmin extended-status
+
+
+环境
+CentOS 6.6 amd64
+zabbix 2.4.x
+mysql 5.6.x 
+
+目标
+监控 mysql 数据库,包括性能图表,mysql 服务存活状态.
+
+
+准备工作
+
+1. mysql用户
+可以使用已有的用户,比如 mysql 复制用户,或者创建新的用户均可.
+
+create database zabbix character set utf8;
+create user 'zabbix'@'localhost' identified by 'dongnan';
+grant all privileges on zabbix.* to 'zabbix'@'localhost';
+
+2. cat /var/lib/zabbix/.my.conf 
+[client]
+#for rep
+host=10.0.2.12
+user=rep1
+password=M389htizm
+socket = /tmp/mysql.sock
+
+#Zabbix Agent
+[mysql]
+host=10.0.2.12
+user=rep1
+password=M389htizm
+socket = /tmp/mysql.sock
+
+[mysqladmin]
+host=10.0.2.12
+user=rep1
+password=M389htizm
+socket = /tmp/mysql.sock
+
+chmod 600 /var/lib/zabbix/.my.conf
+chown zabbix.zabbix /var/lib/zabbix/.my.conf
+
+操作步骤
+
+zabbix_agent 
+
+1. 编辑 zabbix_agentd.conf
+确保 Include=/etc/zabbix/zabbix_agentd.d/
+
+2. 编辑 userparameter_mysql.conf
+
+内容类似如下
+awk '! /^(#|$)/' /etc/zabbix/zabbix_agentd.d/userparameter_mysql.conf 
+UserParameter=mysql.status[*],echo "show global status where Variable_name='$1';" | /usr/local/mysql/bin/mysql --defaults-file=/var/lib/zabbix/.my.conf -N | awk '{print $$2}'
+UserParameter=mysql.size[*],echo "select sum($(case "$3" in both|"") echo "data_length+index_length";; data|index) echo "$3_length";; free) echo "data_free";; esac)) from information_schema.tables$([[ "$1" = "all" || ! "$1" ]] || echo " where table_schema='$1'")$([[ "$2" = "all" || ! "$2" ]] || echo "and table_name='$2'");" | /usr/local/mysql/bin/mysql --defaults-file=/var/lib/zabbix/.my.conf -N
+UserParameter=mysql.ping,/usr/local/mysql/bin/mysqladmin --defaults-file=/var/lib/zabbix/.my.conf ping | grep -c alive
+UserParameter=mysql.version,mysql -V
+
+3. 重启zabbix_agent
+/etc/init.d/zabbix-agent restart
+
+
+模板
+1. 导入 Template App MySQL 模板
+   下载模板
+
+2. 为Host 配置模板
+   zabbix-mysql-1
+
+
+验证
+
+
+
+参考
+yum 方式部署 zabbix 
+http://ywwd.net/read-865
+
+使用Zabbix监控MySQL服务器方法
+http://www.kaijia.me/2014/01/use-zabbix-monitor-mysql-server/
+
+
+
+#####
+磁盘队列调度策略
+
+在 gnu/linux 上, 默认使用cfq (completely fail queueing, 完全公平排队)策略,在台式机与笔记本上使用这个调度策略没有问题,如果是服务器建议更换成 noop 或者 deadline 策略. 
+
+cat /sys/block/sda/queue/scheduler 
+noop anticipatory deadline [cfq] 
+
+######
+
+nginx pic expires 与 rewrite 冲突
+
+描述
+
+expires 
+location ~* \.(gif|jpg|jpeg|png|bmp|swf|ico)$ {
+         expires      30d;
+} 
+
+rewrite
+    location /upload/ {
+        rewrite /upload/([0-9]+)/([a-f0-9]+)_([0-9]+)x([0-9]+)\.([a-z]+)$ /upload/resize_img.php?f=$1/$2.$5&w=$3&h=$4&$args last;
+        rewrite /upload/([0-9]+)/([a-f0-9]+)_(A)x([0-9]+)\.([a-z]+)$ /upload/resize_img.php?f=$1/$2.$5&w=$3&h=$4&$args last;
+        rewrite /upload/([0-9]+)/([a-f0-9]+)_([0-9]+)x(A)\.([a-z]+)$ /upload/resize_img.php?f=$1/$2.$5&w=$3&h=$4&$args last;
+        rewrite /upload/([0-9]+)/([a-f0-9]+)_([0-9]+)x([0-9]+)_([0-9]+)\.([a-z]+)$ /upload/resize_img.php?f=$1/$2.$6&w=$3&h=$4&jpg=$5&$args last;
+    }   
+
+
+同时设置expires 与 rewrite 
+nginx-re1
+
+注释expires 
+nginx-re2
+
+
+10.0.2.10 - - [29/Jun/2015:15:04:21 +0800] "GET /images/weixin.png HTTP/1.1" 200 886 "http://cdn1.ywwd.net/css/global.css" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.130 Safari/537.36" 114.242.158.82
+
+#####
+MySQL 5.6 中 TIMESTAMP 的变化
+http://www.williamsang.com/archives/818.html
+
+######
+https://raw.githubusercontent.com/antirez/redis/3.0/redis.conf
+
+#####
+xenserver vlan
+
+#####
+Nginx Force SSL
+
+#ssl
+    ssl on;
+    ssl_certificate      ssl/xingyoucai.com.crt;
+    ssl_certificate_key  ssl/xingyoucai.com.key;
+
+    # force https-redirects
+    error_page 497 301 =307 https://$server_name$request_uri;inx
+
+http://stackoverflow.com/questions/8768946/dealing-with-nginx-400-the-plain-http-request-was-sent-to-https-port-error
+
+curl -IL http://xingyoucai.com
+HTTP/1.1 307 Temporary Redirect
+Server: Tengine
+Date: Wed, 29 Jul 2015 06:35:01 GMT
+Content-Type: text/html; charset=utf8
+Content-Length: 284
+Connection: close
+Location: https://xingyoucai.com/
+
+HTTP/1.1 200 OK
+Server: Tengine
+Date: Wed, 29 Jul 2015 06:35:02 GMT
+Content-Type: text/html; charset=UTF-8
+Connection: keep-alive
+Vary: Accept-Encoding
+X-Powered-By: PHP/5.6.5
+Set-Cookie: UUID=d12a8832-9ced-114a-62ac-55b8747f4c02; expires=Thu, 28-Jul-2016 06:35:01 GMT; Max-Age=31536000; path=/; domain=.xingyoucai.com
+
+
+#####
+aliyun epel
+
+wget http://mirrors.aliyun.com/repo/epel-7.repo -P /var/yum.repo.d/
+
+
+####
+redis 建立 24个长连接
+
+20141:M 30 Jul 18:37:49.123 - 24 clients connected (0 slaves), 1257448 bytes in use
+20141:M 30 Jul 18:37:54.135 - 24 clients connected (0 slaves), 1257448 bytes in use
+
+
+lsof -i :6379 
+COMMAND  PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+php-fpm 2305  www    7u  IPv4  17593      0t0  TCP pre54:36717->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2306  www    7u  IPv4  17254      0t0  TCP pre54:36623->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2307  www    7u  IPv4  17263      0t0  TCP pre54:36627->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2308  www    7u  IPv4  17287      0t0  TCP pre54:36636->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2309  www    7u  IPv4  17296      0t0  TCP pre54:36640->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2310  www    7u  IPv4  17308      0t0  TCP pre54:36644->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2311  www    7u  IPv4  17360      0t0  TCP pre54:36652->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2312  www    7u  IPv4  17371      0t0  TCP pre54:36656->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2313  www    7u  IPv4  17382      0t0  TCP pre54:36660->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2314  www    7u  IPv4  17418      0t0  TCP pre54:36665->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2315  www    7u  IPv4  17462      0t0  TCP pre54:36669->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2316  www    7u  IPv4  17473      0t0  TCP pre54:36673->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2317  www    7u  IPv4  17484      0t0  TCP pre54:36677->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2318  www    7u  IPv4  17495      0t0  TCP pre54:36681->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2319  www    7u  IPv4  17506      0t0  TCP pre54:36685->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2320  www    7u  IPv4  17517      0t0  TCP pre54:36689->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2321  www    7u  IPv4  17530      0t0  TCP pre54:36694->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2322  www    7u  IPv4  17552      0t0  TCP pre54:36702->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2323  www    7u  IPv4  17876      0t0  TCP pre54:36782->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2324  www    7u  IPv4  17571      0t0  TCP pre54:36709->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2347  www    7u  IPv4  17582      0t0  TCP pre54:36713->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2403  www    7u  IPv4  17278      0t0  TCP pre54:36632->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2404  www    7u  IPv4  17319      0t0  TCP pre54:36648->10.0.100.12:6379 (ESTABLISHED)
+php-fpm 2405  www    7u  IPv4  17541      0t0  TCP pre54:36698->10.0.100.12:6379 (ESTABLISHED)
+
+
+lsof -i :6379 | awk '/php-fpm/ {cum++} END {print cum}'
+24
+
+
+######
+mysql innodb replication
+
+环境
+mysql 5.6.25
+innodb 引擎 
+
+
+目标
+配置 mysql主从环境,在 master 已有数据,添加从库.
+
+Master 
+mysqldump --all-databases --master-data=1 --single-transaction -uroot -p > all.sql
+
+参数见 xxxx
+
+
+Slave
+得到 MASTER_LOG_FILE 与 MASTER_LOG_POS 值;
+
+head -n50 all.sql | awk '/CHANGE MASTER TO MASTER_LOG_FILE/'
+CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000006', MASTER_LOG_POS=19148;
+
+
+mysql> change master to master_host='10.0.100.12',master_user='rep1',master_password='password',master_log_file='mysql-bin.000006',master_log_pos=19148;
+
+
+mysql> start slave;
+
+
+验证
+
+#Slave
+
+mysql> show slave status \G;
+*************************** 1. row ***************************
+               Slave_IO_State: Waiting for master to send event
+                  Master_Host: 10.0.100.12
+                  Master_User: rep1
+                  Master_Port: 3306
+                Connect_Retry: 60
+              Master_Log_File: mysql-bin.000006
+          Read_Master_Log_Pos: 19148
+               Relay_Log_File: mysql-relay-bin.000002
+                Relay_Log_Pos: 283
+        Relay_Master_Log_File: mysql-bin.000006
+             Slave_IO_Running: Yes
+            Slave_SQL_Running: Yes
+              Replicate_Do_DB: 
+          Replicate_Ignore_DB: 
+           Replicate_Do_Table: 
+       Replicate_Ignore_Table: 
+      Replicate_Wild_Do_Table: 
+  Replicate_Wild_Ignore_Table: 
+                   Last_Errno: 0
+                   Last_Error: 
+                 Skip_Counter: 0
+          Exec_Master_Log_Pos: 19148
+              Relay_Log_Space: 456
+              Until_Condition: None
+               Until_Log_File: 
+                Until_Log_Pos: 0
+           Master_SSL_Allowed: No
+           Master_SSL_CA_File: 
+           Master_SSL_CA_Path: 
+              Master_SSL_Cert: 
+            Master_SSL_Cipher: 
+               Master_SSL_Key: 
+        Seconds_Behind_Master: 0
+Master_SSL_Verify_Server_Cert: No
+                Last_IO_Errno: 0
+                Last_IO_Error: 
+               Last_SQL_Errno: 0
+               Last_SQL_Error: 
+  Replicate_Ignore_Server_Ids: 
+             Master_Server_Id: 11
+                  Master_UUID: f587945a-3596-11e5-aaf9-00163e002a82
+             Master_Info_File: /usr/local/mysql/data/master.info
+                    SQL_Delay: 0
+          SQL_Remaining_Delay: NULL
+      Slave_SQL_Running_State: Slave has read all relay log; waiting for the slave I/O thread to update it
+           Master_Retry_Count: 86400
+                  Master_Bind: 
+      Last_IO_Error_Timestamp: 
+     Last_SQL_Error_Timestamp: 
+               Master_SSL_Crl: 
+           Master_SSL_Crlpath: 
+           Retrieved_Gtid_Set: 
+            Executed_Gtid_Set: 
+                Auto_Position: 0
+1 row in set (0.00 sec)
+
+
+
+#Master
+mysql> show processlist \G;
+*************************** 1. row ***************************
+     Id: 768
+   User: rep1
+   Host: 10.51.68.195:51870
+     db: NULL
+Command: Binlog Dump
+   Time: 135
+  State: Master has sent all binlog to slave; waiting for binlog to be updated
+   Info: NULL
+*************************** 2. row ***************************
+省略...
+
+
+
+
+
+
+
+--master-data[=value]
+
+           Use this option to dump a master replication server to produce a dump file that can be used to set up another server as a
+           slave of the master. It causes the dump output to include a CHANGE MASTER TO statement that indicates the binary log
+           coordinates (file name and position) of the dumped server. These are the master server coordinates from which the slave
+           should start replicating after you load the dump file into the slave.
+
+           If the option value is 2, the CHANGE MASTER TO statement is written as an SQL comment, and thus is informative only; it has
+           no effect when the dump file is reloaded. If the option value is 1, the statement is not written as a comment and takes
+           effect when the dump file is reloaded. If no option value is specified, the default value is 1.
+
+           This option requires the RELOAD privilege and the binary log must be enabled.
+
+           The --master-data option automatically turns off --lock-tables. It also turns on --lock-all-tables, unless
+           --single-transaction also is specified, in which case, a global read lock is acquired only for a short time at the beginning
+           of the dump (see the description for --single-transaction). In all cases, any action on logs happens at the exact moment of
+           the dump.
+
+           It is also possible to set up a slave by dumping an existing slave of the master, using the --dump-slave option, which
+           overrides --master-data and causes it to be ignored if both options are used.
+
+
+#####
+opensuse 大版本升级
+
+环境
+opensuse 12.3 amd64
+
+目标
+升级到 13.2 版本
+
+
+
+当前的源
+zypper 
+zypper repos --uri
+# | Alias       | Name                 | Enabled | Refresh | URI                                      
+--+-------------+----------------------+---------+---------+------------------------------------------
+1 | repo-update | openSUSE-12.3-Update | Yes     | Yes     | http://download.opensuse.org/update/12.3/
+
+
+禁用所有的源
+zypper mr -da
+
+
+添加源
+zypper ar -f http://download.openSUSE.org/distribution/12.3/repo/oss/ openSUSE:12.3:OSS
+zypper ar -f http://download.openSUSE.org/distribution/12.3/repo/non-oss/ openSUSE:12.3:NON-OSS
+
+刷新源
+zypper ref
+
+升级系统 
+zypper dup
+
+
+
+关机&开机
+sync && init 0
+
+head -n1 /etc/issue
+Welcome to openSUSE 13.2 "Harlequin" - Kernel \r (\l).
+
+uname -a
+Linux linux 3.16.6-2-xen #1 SMP Mon Oct 20 13:47:22 UTC 2014 (feb42ea) x86_64 x86_64 x86_64 GNU/Linux
+
+xen-detect 
+Running in HVM context on Xen v4.4.
+
+
+xenserver 6.5 安装 opensuse 13.2 
+
+1. 先安装opensuse 12.3 
+2. 安装xentools
+3. 升级到opensuse 13.2
+
+参考
+
+系统升级
+https://zh.opensuse.org/SDB:%E7%B3%BB%E7%BB%9F%E5%8D%87%E7%BA%A7
+
+#####
+
+rm -rf \-h
+rm: invalid option -- 'h'
+Try `rm ./-h' to remove the file `-h'.
+Try `rm --help' for more information.
+
+rm ./-h
+rm: remove regular file `./-h'? y
+
+#####
+nsstat
+
+#####
+top
+h键
+
+Help for Interactive Commands - procps version 3.2.8
+Window 1:Def: Cumulative mode Off.  System: Delay 3.0 secs; Secure mode Off.
+
+  Z,B       Global: 'Z' change color mappings; 'B' disable/enable bold
+  l,t,m     Toggle Summaries: 'l' load avg; 't' task/cpu stats; 'm' mem info
+  1,I       Toggle SMP view: '1' single/separate states; 'I' Irix/Solaris mode
+
+  f,o     . Fields/Columns: 'f' add or remove; 'o' change display order
+  F or O  . Select sort field
+  <,>     . Move sort field: '<' next col left; '>' next col right
+  R,H     . Toggle: 'R' normal/reverse sort; 'H' show threads
+  c,i,S   . Toggle: 'c' cmd name/line; 'i' idle tasks; 'S' cumulative time
+  x,y     . Toggle highlights: 'x' sort field; 'y' running tasks
+  z,b     . Toggle: 'z' color/mono; 'b' bold/reverse (only if 'x' or 'y')
+  u       . Show specific user only
+  n or #  . Set maximum tasks displayed
+
+  k,r       Manipulate tasks: 'k' kill; 'r' renice
+  d or s    Set update interval
+  W         Write configuration file
+  q         Quit
+          ( commands shown with '.' require a visible task display window ) 
+Press 'h' or '?' for help with Windows,
+any other key to continue 
+
+H (大写) show threads
+top1.png
+
+
+
+
+#####
+redis 
+
+dbsize
+:108
+
+
+keys *
+*108
+$23
+virdata_zh_collect_2-32
+....
+$23
+virdata_zh_collect_2-21
+
+查看key的类型
+type logstash:www:access_log
++list
+
+
+redis如何查看所有的key
+http://www.douban.com/group/topic/15516593/
+
+redis入门——redis常用命令
+http://blog.csdn.net/wclxyn/article/details/8449082
+
+redis-cli monitor
+
+
+telnet 10.51.67.230 6379
+Trying 10.51.67.230...
+Connected to 10.51.67.230.
+Escape character is '^]'.
+shutdown
+
+######
+logrotate 
+-d 
+
+http://huoding.com/2013/04/21/246
+
+#####
+pgrep -u
+
+-u euid,...
+              Only match processes whose effective user ID is listed.  Either the numerical or symbolical value may be used.
+
+北京＠uh
+根据进程号找到是执行的哪个目录的nginx
+
+北京@东南
+ps aux | grep nginx
+root      1920  0.0  0.0  22692  1428 ?        Ss   Aug25   0:00 nginx: master process /usr/local/nginx/sbin/nginx
+
+北京@KingGoo.Com
+嗯嗯 还不知道的话 拿起pid  cd /proc/$pid
+
+示例
+ls -l /proc/`pgrep -u root nginx`/exe 
+lrwxrwxrwx 1 root root 0 Aug 26 17:45 /proc/1920/exe -> /usr/local/nginx/sbin/nginx
+
+#####
+/proc 目录
+
+文件描述符
+cat /proc/`pgrep -u root nginx`/limits
+Limit                     Soft Limit           Hard Limit           Units     
+Max cpu time              unlimited            unlimited            seconds   
+Max file size             unlimited            unlimited            bytes     
+Max data size             unlimited            unlimited            bytes     
+Max stack size            10485760             unlimited            bytes     
+Max core file size        0                    unlimited            bytes     
+Max resident set          unlimited            unlimited            bytes     
+Max processes             15207                15207                processes 
+Max open files            1024                 4096                 files     
+Max locked memory         65536                65536                bytes     
+Max address space         unlimited            unlimited            bytes     
+Max file locks            unlimited            unlimited            locks     
+Max pending signals       15207                15207                signals   
+Max msgqueue size         819200               819200               bytes     
+Max nice priority         0                    0                    
+Max realtime priority     0                    0                    
+Max realtime timeout      unlimited            unlimited            us   
+
+#####
+
+netstat 队列
+Recv-Q：表示收到的数据已经在本地接收缓冲，但是还有多少没有被进程取走，recv()
+
+Send-Q：对方没有收到的数据或者说没有Ack的,还是本地缓冲区.
+
+通过netstat的这两个值就可以简单判断程序收不到包到底是包没到还是包没有被进程recv。 
+
+
+netstat -antulp
+Active Internet connections (servers and established)
+Proto Recv-Q Send-Q Local Address               Foreign Address             State       PID/Program name   
+省略....                  
+tcp        0      0 123.57.x.54:10050         58.83.x.221:56101         TIME_WAIT   -                   
+tcp        0   3152 123.57.x.54:22            58.83.x.221:61625         ESTABLISHED 2526/sshd  
+
+内容来自:netstat Recv-Q和Send-Q  
+http://liulinxia02.blog.163.com/blog/static/2686877201261241549434/?COLLCC=1569144444&COLLCC=1485258364&
+
+
+#####
+
+功能
+批量将目录中的图片文件替换到目的目录.
+
+
+使用说明
+编辑脚本，根据实际情况设置目的目录
+
+使用方法
+#确保root权限
+sudo -s
+bash pic_replace.sh
+
+脚本代码
+cat pic_replace.sh 
+#!/bin/bash
+#script_name:pic_replace.sh
+#description:replace pictrues
+#20150826 by http://ywwd.net
+
+#variables
+pic_dir="/data/upload/"
+
+#main
+for file in `ls ./ | grep -v $0` ;do
+    echo $file
+    #pictures dir
+    dst_file=$(find "$pic_dir" -type f -name "$file")
+    #replace 
+    mv -f "$file" "$dst_file"
+    #verify
+    ls -l "$dst_file"
+    #
+    sleep 1
+done 
+
+####
+zabbix 主机克隆
+
+1. 确定目标主机
+zab-clone1.png
+
+2. 选择完整克隆
+
+3. 修改主机信息
+zab-clone2.png
+
+4. 点击添加
+zab-clone3.png
+
+
+#####
+su 命令
+
+以postgre 用户身份创建目录.
+/bin/su - postgres -c 'mkdir -p /home/backup/20150901'
+
+参数
+-c, --command=command
+              Pass command to the shell with the -c option.
+
+#####
+redmine
+{{TOC}}
+
+redmine-toc.png
+
+#####
+错误信息
+dmp.sql:5133: ERROR:  could not open extension control file "/usr/share/postgresql93/extension/plperlu.control": No such file or directory
+
+解决方法
+zypper info postgresql93-plperl | tail -n5
+Description: 
+  This package contains the the PL/Tcl, PL/Perl, and PL/Python procedural
+  languages for the back-end.  With these modules one can use Perl,
+  Python, and Tcl to write stored procedures, functions and triggers.
+  PostgreSQL also offers the builtin procedural language PL/SQL.
+
+
+zypper install postgresql-plperl postgresql93-plperl
+
+
+错误信息2
+ERROR:  could not load library "/usr/lib/postgresql93/lib64/plperl.so": libperl.so: cannot open shared object file: No such file or directory
+
+解决方法
+whereis libperl.so
+libperl:
+
+编辑
+vim /etc/ld.so.conf
+
+添加一行
+/usr/lib/perl5/5.20.1/x86_64-linux-thread-multi/CORE/
+
+ldconfig
+
+#####
+
+http://182.92.113.182:3000/projects/oma/wiki/Pg_dumpall
+
+#####
+nm-tool | grep -i dns
+    DNS:             192.168.150.254
+
+#####
+
+安全相关
+http://www.yundun.cn/help/81.html
+
+跨站脚本攻击XSS
+http://www.cnblogs.com/dolphinX/p/3391351.html
+
+网络攻击技术开篇——SQL Injection
+http://www.cnblogs.com/rush/archive/2011/12/31/2309203.html
+
+OWASP Zed Attack Proxy 2.3.0 发布
+http://www.oschina.net/news/50646/owasp-zed-attack-proxy-2-3-0
+
+
+######
+nginx deny
+http://www.ttlsa.com/linux/nginx-modules-ngx_http_access_module/
+location / {
+deny  192.168.1.1;
+allow 192.168.1.0/24;
+allow 10.1.1.0/16;
+allow 2001:0db8::/32;
+deny  all;
+}
+
+ location /nginx_stat {
+        stub_status on;       # Turn on nginx stats
+        access_log   off;     # We do not need logs for stats
+        allow 127.0.0.1;      # Security: Only allow access from IP
+        deny all;             # Deny requests from the other of the world
+    }   
+
+
+从上到下的顺序，类似iptables。匹配到了便跳出。如上的例子先禁止了192.16.1.1，接下来允许了3个网段，其中包含了一个ipv6，最后未匹配的IP全部禁止访问.  在实际生产环境中，我们也会使用nginx 的geo模块配合使用，有兴趣的请参考ttlsa相关文章nginx geo使用方法.
+
+
+#####
+文件名称
+-rw-r--r-- 1 www  www      10 Sep  9 14:11 ?set|set&set?_200x200.
+
+目标移除到tmp 目录
+
+无效
+mv \?set|set&set?_200x200. /tmp/hack1/
+
+通配符
+mv *_200x200. /tmp/hack1/
+
+示例2
+ls -la | tail -n1
+-rw-r--r--   1 www  www      10 9月   9 14:11 ..\..\..\..\..\..\..\..\windows\win.ini_200x200.ini
+
+
+mv ..\\..\\..\\..\\..\\..\\..\\..\\windows\\win.ini_200x200.ini /tmp/hack3/
+
+#####
+
+cdn 缩略图
+https://cdn2.xingyoucai.com/upload/20150715/17224166453.png!/fwfh/200x200/format/webp
+
+对比
+https://cdn2.xingyoucai.com/uploadhttps://cdn2.xingyoucai.com/upload/20150715/17224166453_136x136.png
+
+https://cdn2.xingyoucai.com/upload/20150715/17224166453.png!/both/136x136/format/webp
+
+参考
+http://blog.upyun.com/?p=328
+http://docs.upyun.com/cdn/feature/#url
+
+#####
+
+nginx -l
+Tengine version: Tengine/2.1.0 (nginx/1.6.2)
+all available directives:
+ngx_core_module:
+    daemon
+    master_process
+    timer_resolutiondingyi
+    pid
+    lock_file
+    worker_processes
+    debug_points
+    user
+    worker_priority
+    worker_cpu_affinity
+    worker_rlimit_nofile
+    worker_rlimit_core
+    worker_rlimit_sigpending
+    working_directory
+    env
+
+
+ngx_http_image_module:
+    image
+    image_output
+    image_backend
+    image_backend_server
+    image_water
+    image_water_type
+    image_water_min
+    image_water_pos
+    image_water_file
+    image_water_transparent
+    image_water_text
+    image_water_font
+    image_water_font_size
+    image_water_color
+    image_jpeg_quality
+
+#####
+缩略图
+
+
+unzip master.zip
+tar zxvf nginx-1.6.3.tar.gz
+./configure --prefix=/usr/local/nginx --with-pcre --with-openssl=/usr/local/openssl-src --with-http_ssl_module --with-http_gzip_static_module --with-http_stub_status_module --user=www --group=www --with-debug --add-module=/root/ngx_image_thumb-master/
+make && make install
+
+vim ywwd.conf
+
+location / {
+ #添加以下配置
+ image on;
+ image_output on;
+ }
+
+验证
+原图
+https://v.xingyoucai.com/upload/20150910/18112635354.jpg
+缩略图
+https://v.xingyoucai.com/upload/20150910/18112635354.c136x136.jpg
+
+
+https://v.xingyoucai.com/upload/20150722/11073670528.m136x136.jpg
+https://v.xingyoucai.com/upload/20150910/18112635354.c136x136.jpg
+
+注意： 与其它图片的location 冲突，例如缓存时间。
+   location ~* \.(gif|jpg|jpeg|png|bmp|swf|ico)$ {
+        expires      30d;
+    }
+
+
+
+示例1 
+
+     location ~* /upload/ {
+         #image_filter resize 200 200;
+         image_filter crop 200 200;
+     }
+
+shili2
+    location ~* (.+)_(\d+)x(\d+)\.(png|jpg|gif)$ {
+       set $width        $2;
+       set $height       $3;
+       rewrite (.+)_(\d+)x(\d+)\.(jpg|gif|png)$ $1.$4 last;
+    }
+
+    location ~* /upload/.*\.(jpg|gif|png)$ {
+       image_filter crop $width $height;
+    }
+
+Nginx Image 缩略图 模块
+https://github.com/3078825/ngx_image_thumb
+
+
+#####
+nginx debug
+
+http://nginx.org/en/docs/debugging_log.html
+
+tail logs/nginx_error.log -f | grep -Ev "post|epoll|worker|timer|accept"
+
+2015/09/14 19:11:24 [notice] 22535#0: *289 "(.*)_(.*)x(.*)\.(jpg|gif|png)$" matches "/upload/20150717/11565098338_200x200.jpg", client: 10.0.2.222, server: v.xingyoucai.com, request: "GET /upload/20150717/11565098338_200x200.jpg HTTP/1.1", host: "v.xingyoucai.com"
+2015/09/14 19:11:24 [debug] 22535#0: *289 http script capture: "/upload/20150717/11565098338"
+2015/09/14 19:11:24 [debug] 22535#0: *289 http script copy: "\."
+2015/09/14 19:11:24 [debug] 22535#0: *289 http script capture: "jpg"
+2015/09/14 19:11:24 [debug] 22535#0: *289 http script regex end
+2015/09/14 19:11:24 [notice] 22535#0: *289 rewritten data: "/upload/20150717/11565098338\.jpg", args: "", client: 10.0.2.222, server: v.xingyoucai.com, request: "GET /upload/20150717/11565098338_200x200.jpg HTTP/1.1", host: "v.xingyoucai.com"
+
+#####
+nfs nobody 问题
+
+环境
+CentOS 6.7 amd64
+nfs v4 
+nfs server 10.0.100.1
+nfs client 10.0.100.2 
+
+错误描述
+nfs 客户端挂载目录后写入文件的属主与属组 为nobody ，php 程序提示没有写入权限。
+-rw-r--r-- 1 nobody nobody      0 Sep 15 12:15 abc
+
+排错过程
+1. 可以确定不是因为nfs v4 域问题导致的,详见 http://ywwd.net/read-209#744
+2. 发现NFS客户端与服务器端的web用户名的用户与组id 不同。
+
+
+解决方法
+将NFS客户端与服务器端的,web用户名的用户与组ID 设置为相同。
+
+
+#####
+NFS配置不当那些事
+http://drops.wooyun.org/tips/8659
+
+#####
+tree /data/upload/ | tail -n1
+123 directories, 42127 files
+
+#####
+chrome 浏览器调试
+chrome-1.png
+
+#####
+Haproxy HA(Keepalived)
+
+#####
+阿里云超售严重
+
+相同配置服务器(2cpu/2GB内存)，以安装php 为例
+tar zxf php-5.6.13.tar.gz 
+cd php-5.6.13
+
+1. 本地 xenserver 开出虚拟机 
+
+#配置时间
+time ./configure
+省略....
+
+real	0m17.101s
+user	0m7.954s
+sys	0m4.053s
+
+#编译时间
+time make
+省略....
+
+real	4m58.514s
+user	3m49.503s
+sys	0m18.409s
+
+
+2. 阿里云服务器
+
+#配置时间
+time ./configure
+省略....
+
+real	0m27.554s
+user	0m8.935s
+sys	0m5.336s
+
+#编译时间
+time make
+省略....
+
+real	13m57.658s
+user	5m13.104s
+sys	8m1.116s
+
+
+小结
+对比之下 configure 阶段差距并不大，但是make 阶段阿里云服务器的尾巴漏出来了。
+
+
+####
+http://tengine.taobao.org/download/tengine-2.1.1.tar.gz
+http://tengine.taobao.org/changelog_cn.html#2_1_1
